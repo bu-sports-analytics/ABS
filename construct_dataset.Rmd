@@ -1,0 +1,56 @@
+---
+title: "Construct Dataset"
+output: html_document
+date: "2025-12-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+# Install baseballr through pacman - this may take ~30 mins
+if (!requireNamespace('pacman', quietly = TRUE)){
+  install.packages('pacman')
+}
+pacman::p_load_current_gh("billpetti/baseballr")
+library(dplyr)
+```
+
+```{r}
+game_pks <- mlb_game_pks("2025-06-06", level_ids = c(11))
+dates <- seq(as.Date("2025-05-01"), as.Date("2025-05-06"), by = "day")
+
+# Get all game codes of AAA from May 1st to May 6th 2025
+game_list <- lapply(dates, function(d) {
+  game_pks_df <- mlb_game_pks(as.character(d), level_ids = c(11))
+  game_pks_df$game_pk
+})
+# game_list is a list of lists - we unroll this
+game_list <-  unlist(game_list)
+
+# Get the list of filtered dataframes from every game
+dfs <- lapply(game_list, function(game) {
+  print(game)
+  tryCatch({
+  df <- mlb_pbp(game_pk = game)
+  print(nrow(df)) # printing for verification purposes, this can be removed soon enough
+  if (!"reviewDetails.reviewType" %in% names(df)) {
+    df$reviewDetails.reviewType <- "NONE"
+  }
+  # I think MJ means a player-initiated review, although I'm not quite sure why
+  # or what it stands for
+  df %>%
+    filter(details.hasReview == TRUE & reviewDetails.reviewType == "MJ")
+  }, error = function(e) {
+  NULL
+  })
+})
+# bind them together into the complete dataset of pitches with reviews
+all_reviews <- bind_rows(dfs)
+
+```
+
+
