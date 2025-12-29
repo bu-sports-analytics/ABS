@@ -21,9 +21,9 @@ library(dplyr)
 
 ```{r}
 game_pks <- mlb_game_pks("2025-06-06", level_ids = c(11))
-dates <- seq(as.Date("2025-05-01"), as.Date("2025-05-06"), by = "day")
+dates <- seq(as.Date("2025-06-04"), as.Date("2025-07-04"), by = "day")
 
-# Get all game codes of AAA from May 1st to May 6th 2025
+# Get all game codes of AAA from June 4th to July 4th
 game_list <- lapply(dates, function(d) {
   game_pks_df <- mlb_game_pks(as.character(d), level_ids = c(11))
   game_pks_df$game_pk
@@ -32,8 +32,9 @@ game_list <- lapply(dates, function(d) {
 game_list <-  unlist(game_list)
 
 # Get the list of filtered dataframes from every game
-dfs <- lapply(game_list, function(game) {
-  print(game)
+dfs <- lapply(seq_len(game_list), function(i) {
+  game <- game_list[i]
+  message(paste("Processing row:", i, "of", nrow(game_list), "| Game ID:", game))
   tryCatch({
   df <- mlb_pbp(game_pk = game)
   print(nrow(df)) # printing for verification purposes, this can be removed soon enough
@@ -41,9 +42,12 @@ dfs <- lapply(game_list, function(game) {
     df$reviewDetails.reviewType <- "NONE"
   }
   # I think MJ means a player-initiated review, although I'm not quite sure why
-  # or what it stands for
+  # - J is pitch result, M is timed play(?)
   df %>%
-    filter(details.hasReview == TRUE & reviewDetails.reviewType == "MJ")
+    filter((details.hasReview == TRUE | # details and about catch two different
+              # sets of plays which both seem to be challenges of balls/strikes
+              about.hasReview == TRUE) &
+             reviewDetails.reviewType != "NONE")
   }, error = function(e) {
   NULL
   })
